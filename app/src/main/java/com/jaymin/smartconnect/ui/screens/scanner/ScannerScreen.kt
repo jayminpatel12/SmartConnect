@@ -48,16 +48,19 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.jaymin.smartconnect.core.domain.model.BluetoothDeviceInfo
 import com.jaymin.smartconnect.core.domain.model.DeviceType
@@ -83,6 +86,13 @@ fun ScannerScreen(viewModel: ScannerViewModel = hiltViewModel()) {
     }
 
     val permissionState = rememberMultiplePermissionsState(permissions)
+
+    // Automatically start scan once permissions are granted
+    LaunchedEffect(permissionState.allPermissionsGranted) {
+        if (permissionState.allPermissionsGranted && !uiState.isScanning && uiState.scannedDevices.isEmpty()) {
+            viewModel.startScan()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -154,11 +164,40 @@ fun ScannerScreen(viewModel: ScannerViewModel = hiltViewModel()) {
             }
 
             if (uiState.isScanning && uiState.scannedDevices.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Scanning for nearby devices...", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            } else if (!uiState.isScanning && uiState.scannedDevices.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.Bluetooth,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "No devices found nearby",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Make sure other devices are in discoverable mode and location services are enabled.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(onClick = { viewModel.startScan() }) {
+                            Text("Scan Again")
+                        }
                     }
                 }
             }

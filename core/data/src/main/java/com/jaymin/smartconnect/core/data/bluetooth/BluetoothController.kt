@@ -9,6 +9,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.location.LocationManager
+import android.os.Build
 import com.jaymin.smartconnect.core.common.util.Constants
 import com.jaymin.smartconnect.core.common.util.Resource
 import com.jaymin.smartconnect.core.domain.model.BluetoothDeviceInfo
@@ -52,14 +54,27 @@ class BluetoothController @Inject constructor(
         override fun onReceive(ctx: Context?, intent: Intent?) {
             when (intent?.action) {
                 BluetoothDevice.ACTION_FOUND -> {
-                    val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
+
                     val rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE).toInt()
                     device?.let {
                         val info = it.toDeviceInfo(rssi)
                         _scannedDevices.update { list ->
-                            if (list.none { d -> d.address == info.address }) list + info else list
+                            if (list.none { d -> d.address == info.address }) {
+                                list + info
+                            } else {
+                                list.map { d -> if (d.address == info.address) info else d }
+                            }
                         }
                     }
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
+                    _isScanning.value = true
                 }
                 BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
                     _isScanning.value = false
@@ -80,20 +95,43 @@ class BluetoothController @Inject constructor(
             return@flow
         }
 
+        // Check if location services are enabled (required for BT scanning on most Android versions)
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+        val isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        if (!isGpsEnabled && !isNetworkEnabled) {
+            emit(Resource.Error("Location services are disabled. Please enable them to scan for devices."))
+            return@flow
+        }
+
         _scannedDevices.value = emptyList()
+        // Discovery is asynchronous, so we wait for ACTION_DISCOVERY_STARTED via receiver
+        // but we set it here as well for immediate UI feedback
         _isScanning.value = true
 
         val filter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
         }
-        context.registerReceiver(foundDeviceReceiver, filter)
-        bluetoothAdapter.startDiscovery()
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(foundDeviceReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            context.registerReceiver(foundDeviceReceiver, filter)
+        }
+
+        val success = bluetoothAdapter.startDiscovery()
+        if (!success) {
+            _isScanning.value = false
+            emit(Resource.Error("Failed to start Bluetooth discovery"))
+            return@flow
+        }
 
         // Also refresh paired devices
         _pairedDevices.value = getPairedDevices()
 
-        // Wait for scan to finish
+        // Wait for scan to finish or timeout
         kotlinx.coroutines.delay(Constants.SCAN_DURATION_MS)
         stopScan()
         emit(Resource.Success(_scannedDevices.value))
