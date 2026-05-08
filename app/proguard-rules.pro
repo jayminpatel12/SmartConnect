@@ -1,0 +1,2 @@
+-keep class com.google.firebase.** { *; }
+-keep class com.jaymin.smartconnect.core.data.local.entity.** { *; }
