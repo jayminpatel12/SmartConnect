@@ -1,10 +1,24 @@
+# Android Studio / IntelliJ
+.idea/
 *.iml
-.gradle
-/local.properties
-/.idea
+.gradle/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+cmake-build-debug/
+cmake-build-release/
+output.json
+
+# Build outputs
+**/build/
+
+# Kotlin
+*.stackdump
+
+# OS generated files
 .DS_Store
-/build
-/captures
-/app/build
-/core/*/build
+Thumbs.db
+
+# Project specific
 google-services.json
