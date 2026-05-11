@@ -1,3 +1,13 @@
+<!-- PORTFOLIO
+title: SmartConnect
+subtitle: Bluetooth Scanner & NFC Tap-to-Share
+description: Hardware-integrated Android app with Bluetooth device discovery, signal strength monitoring, NFC read/write for tap-to-share, and Firebase-synced transfer history. MVVM + Clean Architecture across 4 modules.
+tags: Kotlin, Jetpack Compose, Bluetooth API, NFC / NDEF, Firebase, Hilt, MVVM, Room DB
+icon: 📡
+order: 2
+-->
+
+
 # SmartConnect — Bluetooth Scanner & NFC Tap-to-Share
 
 A modern Android app built with **Kotlin**, **Jetpack Compose**, **MVVM + Clean Architecture**, and **Firebase** for Bluetooth device discovery and NFC-based data sharing.
